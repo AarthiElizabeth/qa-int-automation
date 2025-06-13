@@ -1,0 +1,29 @@
+base_url: "https://line.gateway.jp.int-team.qa.zeals.cloud/webhook"
+tenant_id: "tenant1"
+channel_id: "cd603b28-5065-4edc-bc09-b2e57467b374"
+channel_secret: "c873c24020d7775904948d19170f10fa"
+
+test_cases:
+  - name: "TC-001 Text Event"
+    payload_file: "payloads/text_event.json"
+    expected_status: 200
+  
+  - name: "TC-002 Follow Event"
+    payload_file: "payloads/follow.json"
+    expected_status: 200
+  
+  - name: "TC-003 Unfollow Event"
+    payload_file: "payloads/unfollow.json"
+    expected_status: 200
+  
+  - name: "TC-004 Postback Event"
+    payload_file: "payloads/postback.json"
+    expected_status: 200
+  
+  - name: "TC-005 Rich Menu Event"
+    payload_file: "payloads/rich_menu.json"
+    expected_status: 200
+  
+  - name: "TC-006 Multiple Choice"
+    payload_file: "payloads/multiple_choice.json"
+    expected_status: 200

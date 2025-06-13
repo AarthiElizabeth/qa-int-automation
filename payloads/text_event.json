@@ -1,0 +1,1 @@
+{"events": [{"type": "message", "message": {"type": "text", "id": "123456", "text": "hello from Archean slime"}, "timestamp": 1747656296707, "source": {"type": "user", "userId": "Uxxxxxxx"}, "replyToken": "replyToken123", "mode": "active"}]}

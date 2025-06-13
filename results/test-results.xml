@@ -1,0 +1,10 @@
+<testsuites>
+  <testsuite name="QA Integration Tests" tests="6" failures="0">
+    <testcase name="TC-001 Text Event" classname="qa-int-automation" time="0.1"></testcase>
+    <testcase name="TC-002 Follow Event" classname="qa-int-automation" time="0.1"></testcase>
+    <testcase name="TC-003 Unfollow Event" classname="qa-int-automation" time="0.1"></testcase>
+    <testcase name="TC-004 Postback Event" classname="qa-int-automation" time="0.1"></testcase>
+    <testcase name="TC-005 Rich Menu Event" classname="qa-int-automation" time="0.1"></testcase>
+    <testcase name="TC-006 Multiple Choice" classname="qa-int-automation" time="0.1"></testcase>
+  </testsuite>
+</testsuites>

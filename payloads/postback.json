@@ -1,0 +1,1 @@
+{"events": [{"type": "postback", "timestamp": 1747656296707, "source": {"type": "user", "userId": "Uxxxxxxx"}, "replyToken": "replyToken123", "mode": "active", "postback": {"data": "action=buy&itemid=123"}}]}
