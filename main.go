@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"qa-int-automation/junitexport"
+	"qa-int-automation/qase" // New package for Qase sync
 	"qa-int-automation/tester"
 
 	"gopkg.in/yaml.v2"
@@ -29,26 +32,40 @@ type QasePayload struct {
 }
 
 func main() {
+	var (
+		syncOnly bool
+		config   *tester.TestSuite
+		err      error
+	)
+
+	flag.BoolVar(&syncOnly, "sync-only", false, "Only sync test cases to Qase")
+	flag.Parse()
+
 	log.Println("Starting test execution")
 	startTime := time.Now()
 
-	// Load configuration
-	config, err := loadConfig("config/testcases.yaml")
-	if err != nil {
+	if config, err = loadConfig("config/testcases.yaml"); err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
 
-	// Run test cases
+	// Sync test cases to Qase
+	if err = syncQaseTestCases(config); err != nil {
+		log.Printf("QASE sync warning: %v", err)
+	}
+
+	if syncOnly {
+		return // Exit if only syncing
+	}
+
+	// Normal test execution flow
 	qaseResults, testResults := runTestSuite(config)
 
-	// Generate reports
-	if err := generateReports(testResults); err != nil {
+	if err = generateReports(testResults); err != nil {
 		log.Printf("Report generation error: %v", err)
 	}
 
-	// Send results to QASE
 	if qaseRunID := os.Getenv("QASE_RUN_ID"); qaseRunID != "" {
-		if err := sendToQase(qaseRunID, qaseResults); err != nil {
+		if err = sendToQase(qaseRunID, qaseResults); err != nil {
 			log.Printf("QASE reporting error: %v", err)
 		}
 	} else {
@@ -58,6 +75,20 @@ func main() {
 	log.Printf("Test execution completed in %v", time.Since(startTime))
 }
 
+func syncQaseTestCases(suite *tester.TestSuite) error {
+	apiToken := os.Getenv("QASE_API_TOKEN")
+	projectCode := os.Getenv("QASE_PROJECT_CODE")
+	if apiToken == "" || projectCode == "" {
+		return fmt.Errorf("QASE credentials not set - skipping sync")
+	}
+
+	client := qase.NewClient(apiToken, projectCode)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	return client.SyncTestCases(ctx, suite.TestCases)
+}
+
 func loadConfig(path string) (*tester.TestSuite, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -65,11 +96,10 @@ func loadConfig(path string) (*tester.TestSuite, error) {
 	}
 
 	var suite tester.TestSuite
-	if err := yaml.Unmarshal(data, &suite); err != nil {
+	if err = yaml.Unmarshal(data, &suite); err != nil {
 		return nil, fmt.Errorf("YAML unmarshal error: %w", err)
 	}
 
-	// Validate configuration
 	if suite.BaseURL == "" || suite.TenantID == "" || suite.ChannelID == "" || suite.Secret == "" {
 		return nil, fmt.Errorf("missing required configuration fields")
 	}
@@ -123,12 +153,10 @@ func generateReports(results []tester.Result) error {
 		return fmt.Errorf("failed to create results directory: %w", err)
 	}
 
-	// HTML Report
 	if err := tester.GenerateHTMLReport(results, "results/report.html"); err != nil {
 		return fmt.Errorf("HTML report generation failed: %w", err)
 	}
 
-	// JUnit Report
 	if err := junitexport.ExportToJUnit(results, "results/test-results.xml"); err != nil {
 		return fmt.Errorf("JUnit report generation failed: %w", err)
 	}
@@ -174,6 +202,5 @@ func sendToQase(runID string, results []QaseResult) error {
 		return fmt.Errorf("QASE API error: %d - %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("Successfully reported %d results to QASE run %s", len(results), runID)
 	return nil
 }

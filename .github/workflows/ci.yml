@@ -1,62 +1,97 @@
-name: CI Pipeline with Qase Reporting
+name: CI Pipeline with Qase Integration
 
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - '**.go'
+      - 'config/**'
+      - '.github/workflows/**'
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   GO_VERSION: '1.21'
   QASE_RUN_NAME: 'Automated Tests - ${{ github.sha }}'
-  QASE_ENV_ID: qa-int
+  QASE_ENV_ID: 'qa-int'
 
 jobs:
   test:
+    name: Test and Report
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
-      - name: Create Qase Run
-        id: create-run
-        uses: qase-tms/gh-actions/run-create@v1
-        with:
-          token: ${{ secrets.QASE_API_TOKEN }}
-          project: ${{ secrets.QASE_PROJECT_CODE }}
-          title: ${{ env.QASE_RUN_NAME }}
-          environment: ${{ env.QASE_ENV_ID }}
+    - name: Sync Test Cases to Qase
+      env:
+        QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
+        QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
+      run: |
+        go run main.go -sync-only
 
-      - name: Run tests
-        run: |
-          mkdir -p results
-          go test ./... -json > results/test-results.json
-          mkdir -p artifacts && cp -r results artifacts/
+    - name: Create Qase Test Run
+      id: create-run
+      uses: qase-tms/qase-runner@v1
+      with:
+        api-token: ${{ secrets.QASE_API_TOKEN }}
+        project-code: ${{ secrets.QASE_PROJECT_CODE }}
+        operation: create
+        title: ${{ env.QASE_RUN_NAME }}
+        env-id: ${{ env.QASE_ENV_ID }}
+      continue-on-error: true
 
-      - name: Upload to Qase
-        uses: qase-tms/gh-actions/report@v1
-        with:
-          token: ${{ secrets.QASE_API_TOKEN }}
-          project: ${{ secrets.QASE_PROJECT_CODE }}
-          id: ${{ steps.create-run.outputs.id }}
-          format: junit
-          path: results/
+    - name: Run Tests
+      env:
+        QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
+        QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
+        QASE_RUN_ID: ${{ steps.create-run.outputs.run-id }}
+      run: |
+        go mod tidy
+        go run main.go
+        mkdir -p artifacts
+        cp -r results/* artifacts/
 
-      - name: Complete Qase Run
-        if: always() && steps.create-run.outcome == 'success'
-        uses: qase-tms/gh-actions/run-complete@v1
-        with:
-          token: ${{ secrets.QASE_API_TOKEN }}
-          project: ${{ secrets.QASE_PROJECT_CODE }}
-          id: ${{ steps.create-run.outputs.id }}
+    - name: Upload Results to Qase
+      if: always() && steps.create-run.outputs.run-id
+      uses: qase-tms/qase-runner@v1
+      with:
+        api-token: ${{ secrets.QASE_API_TOKEN }}
+        project-code: ${{ secrets.QASE_PROJECT_CODE }}
+        operation: complete
+        run-id: ${{ steps.create-run.outputs.run-id }}
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-${{ github.run_id }}
-          path: artifacts/
-          retention-days: 7
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ github.run_id }}
+        path: artifacts/
+        retention-days: 7
+
+  sync:
+    name: Sync Test Cases
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Sync to Qase
+      env:
+        QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
+        QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
+      run: |
+        go run main.go -sync-only
