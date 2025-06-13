@@ -13,55 +13,50 @@ env:
 
 jobs:
   test:
-    name: Run Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-    - name: Create Qase Test Run
-      id: create-run
-      uses: qase-tms/github-action@v1
-      with:
-        api-token: ${{ secrets.QASE_API_TOKEN }}
-        project-code: ${{ secrets.QASE_PROJECT_CODE }}
-        operation: create
-        title: ${{ env.QASE_RUN_NAME }}
-        env-id: ${{ env.QASE_ENV_ID }}
-      continue-on-error: true
+      - name: Create Qase Run
+        id: create-run
+        uses: qase-tms/gh-actions/run-create@v1
+        with:
+          token: ${{ secrets.QASE_API_TOKEN }}
+          project: ${{ secrets.QASE_PROJECT_CODE }}
+          title: ${{ env.QASE_RUN_NAME }}
+          environment: ${{ env.QASE_ENV_ID }}
 
-    - name: Run tests with Qase reporting
-      env:
-        QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
-        QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
-        QASE_RUN_ID: ${{ steps.create-run.outputs.run-id }}
-        GITHUB_CONTEXT: ${{ toJson(github) }}
-      run: |
-        go mod tidy
-        go run main.go
-        mkdir -p artifacts
-        cp -r results/* artifacts/
+      - name: Run tests
+        run: |
+          mkdir -p results
+          go test ./... -json > results/test-results.json
+          mkdir -p artifacts && cp -r results artifacts/
 
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-${{ github.run_id }}
-        path: artifacts/
-        retention-days: 7
+      - name: Upload to Qase
+        uses: qase-tms/gh-actions/report@v1
+        with:
+          token: ${{ secrets.QASE_API_TOKEN }}
+          project: ${{ secrets.QASE_PROJECT_CODE }}
+          id: ${{ steps.create-run.outputs.id }}
+          format: junit
+          path: results/
 
-    - name: Complete Qase Run
-      if: always() && steps.create-run.outputs.run-id
-      uses: qase-tms/github-action@v1
-      with:
-        api-token: ${{ secrets.QASE_API_TOKEN }}
-        project-code: ${{ secrets.QASE_PROJECT_CODE }}
-        operation: complete
-        run-id: ${{ steps.create-run.outputs.run-id }}
+      - name: Complete Qase Run
+        if: always() && steps.create-run.outcome == 'success'
+        uses: qase-tms/gh-actions/run-complete@v1
+        with:
+          token: ${{ secrets.QASE_API_TOKEN }}
+          project: ${{ secrets.QASE_PROJECT_CODE }}
+          id: ${{ steps.create-run.outputs.id }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 7
