@@ -9,7 +9,7 @@ on:
 env:
   GO_VERSION: '1.21'
   QASE_RUN_NAME: 'Automated Tests - ${{ github.sha }}'
-  QASE_ENV_ID: 1
+  QASE_ENV_ID: qa-int
 
 jobs:
   test:
