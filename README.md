@@ -28,7 +28,7 @@ go run main.go
 - Generates `report.html` summarizing all test responses
 
 ## ✅ Folder Structure
-qa-int-automation/
+<!-- qa-int-automation/
 ├── config/
 │   └── testcases.yaml
 ├── payloads/
@@ -50,4 +50,4 @@ qa-int-automation/
 │   └── export_junit.go
 ├── main.go
 ├── README.md
-└── .gitignore
+└── .gitignore -->

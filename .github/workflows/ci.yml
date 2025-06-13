@@ -9,14 +9,14 @@ on:
 env:
   GO_VERSION: '1.21'
   QASE_RUN_NAME: 'Automated Tests - ${{ github.sha }}'
-  QASE_ENV_ID: 1  # Your Qase environment ID
+  QASE_ENV_ID: 1
 
 jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -28,14 +28,14 @@ jobs:
 
     - name: Create Qase Test Run
       id: create-run
-      uses: qase-tms/qase-runner@v1
+      uses: qase-tms/github-action@v1
       with:
         api-token: ${{ secrets.QASE_API_TOKEN }}
         project-code: ${{ secrets.QASE_PROJECT_CODE }}
         operation: create
         title: ${{ env.QASE_RUN_NAME }}
         env-id: ${{ env.QASE_ENV_ID }}
-      continue-on-error: true  # Allows tests to run even if Qase fails
+      continue-on-error: true
 
     - name: Run tests with Qase reporting
       env:
@@ -46,12 +46,11 @@ jobs:
       run: |
         go mod tidy
         go run main.go
-        # Archive results
         mkdir -p artifacts
         cp -r results/* artifacts/
 
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ github.run_id }}
@@ -60,7 +59,7 @@ jobs:
 
     - name: Complete Qase Run
       if: always() && steps.create-run.outputs.run-id
-      uses: qase-tms/qase-runner@v1
+      uses: qase-tms/github-action@v1
       with:
         api-token: ${{ secrets.QASE_API_TOKEN }}
         project-code: ${{ secrets.QASE_PROJECT_CODE }}
