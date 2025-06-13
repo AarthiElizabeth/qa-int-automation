@@ -14,7 +14,7 @@ on:
 env:
   GO_VERSION: '1.21'
   QASE_RUN_NAME: 'Automated Tests - ${{ github.sha }}'
-  QASE_ENV_ID: 'qa-int'
+  QASE_ENV_SLUG: 'qa-int'
 
 jobs:
   test:
@@ -35,63 +35,44 @@ jobs:
       env:
         QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
         QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
-      run: |
-        go run main.go -sync-only
+      run: go run main.go -sync-only
 
     - name: Create Qase Test Run
       id: create-run
-      uses: qase-tms/qase-runner@v1
+      uses: qase-tms/gh-actions/run-create@v1
       with:
-        api-token: ${{ secrets.QASE_API_TOKEN }}
-        project-code: ${{ secrets.QASE_PROJECT_CODE }}
-        operation: create
+        token: ${{ secrets.QASE_API_TOKEN }}
+        project: ${{ secrets.QASE_PROJECT_CODE }}
         title: ${{ env.QASE_RUN_NAME }}
-        env-id: ${{ env.QASE_ENV_ID }}
-      continue-on-error: true
+        environment: ${{ env.QASE_ENV_SLUG }}
 
     - name: Run Tests
-      env:
-        QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
-        QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
-        QASE_RUN_ID: ${{ steps.create-run.outputs.run-id }}
       run: |
         go mod tidy
         go run main.go
-        mkdir -p artifacts
-        cp -r results/* artifacts/
+        mkdir -p results && touch results/test-results.xml  # Replace with real output
 
-    - name: Upload Results to Qase
-      if: always() && steps.create-run.outputs.run-id
-      uses: qase-tms/qase-runner@v1
+    - name: Upload to Qase
+      uses: qase-tms/gh-actions/report@v1
       with:
-        api-token: ${{ secrets.QASE_API_TOKEN }}
-        project-code: ${{ secrets.QASE_PROJECT_CODE }}
-        operation: complete
-        run-id: ${{ steps.create-run.outputs.run-id }}
+        token: ${{ secrets.QASE_API_TOKEN }}
+        project: ${{ secrets.QASE_PROJECT_CODE }}
+        id: ${{ steps.create-run.outputs.id }}
+        format: junit
+        path: results/test-results.xml
+
+    - name: Complete Qase Run
+      if: always()
+      uses: qase-tms/gh-actions/run-complete@v1
+      with:
+        token: ${{ secrets.QASE_API_TOKEN }}
+        project: ${{ secrets.QASE_PROJECT_CODE }}
+        id: ${{ steps.create-run.outputs.id }}
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ github.run_id }}
-        path: artifacts/
+        path: results/
         retention-days: 7
-
-  sync:
-    name: Sync Test Cases
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    
-    - name: Sync to Qase
-      env:
-        QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
-        QASE_PROJECT_CODE: ${{ secrets.QASE_PROJECT_CODE }}
-      run: |
-        go run main.go -sync-only
