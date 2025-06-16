@@ -1,12 +1,11 @@
 
 # LINE Webhook Tester in Go
 
-This is a simple Go-based testing framework for mocking various LINE webhook events like:
-
-- Free Text Message
-- Follow / Unfollow
-- Rich Menu Tap
-- Postback (Multiple Choice)
+This framework tests LINE webhook integrations with:
+- Test execution and validation
+- Pub/Sub delivery verification
+- Qase test management integration
+- HTML and JUnit reporting
 
 ## 🧪 Usage
 
